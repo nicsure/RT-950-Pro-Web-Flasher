@@ -20,7 +20,7 @@ The first captured request (`BOOTLOADER_V3`) has CRC `0x4034`, which validates t
 
 ## Flash sequence
 
-For a `9216`-byte image, the capture performs the following sequence:
+The capture performs the following sequence:
 
 1. Command `0A`: payload ASCII `BOOTLOADER_V3`.
 2. Command `02`: 32-byte image identity header from offset `992` (`0x3E0`) of the `.btf` image.
