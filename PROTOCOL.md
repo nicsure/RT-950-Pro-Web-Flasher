@@ -24,7 +24,7 @@ For a `9216`-byte image, the capture performs the following sequence:
 
 1. Command `0A`: payload ASCII `BOOTLOADER_V3`.
 2. Command `02`: 32-byte image identity header from offset `992` (`0x3E0`) of the `.btf` image.
-3. Command `04`: big-endian uint16 of the final block index (`8` for nine 1024-byte blocks).
+3. Command `04`: big-endian uint16 of the final block index (total block count minus one).
 4. Command `03`: firmware blocks, each exactly 1024 bytes, sequenced from `0`.
 5. Command `45`: no payload; instructs the device to finish/restart.
 
