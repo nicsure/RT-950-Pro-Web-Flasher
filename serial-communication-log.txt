@@ -2,6 +2,8 @@
 COM2 = Computer
 COM6 = Device
 
+Serial log of the process of flashing nicfw950_GPIO_Diag.btf to the device.
+The nicfw950_GPIO_Diag.btf is supplied for reference in the root of this repository.
 
 +--------------------------------------------------------------------+
 | COM2 -> COM6 (Length:22)                                           |
