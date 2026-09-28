@@ -5,7 +5,7 @@ A browser-only firmware flasher for the Radtel RT-950 Pro handheld transceiver. 
 ## Use
 
 1. Serve this directory from **localhost or HTTPS** (Web Serial requires a secure context), for example: `python3 -m http.server 8000`.
-2. Open the site in a current Chromium-based browser (Chrome or Edge). Or click this link to run from here.
+2. Open the site in a current Chromium-based browser (Chrome or Edge). Or click this link to run from here.  
    https://nicsure.github.io/RT-950-Pro-Web-Flasher/
 4. Put the radio into bootloader/programming mode and connect its programming cable.
 5. Select the `.btf` file, choose **Connect serial device**, then choose **Flash firmware**.
