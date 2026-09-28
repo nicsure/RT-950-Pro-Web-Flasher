@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Web Serial firmware flasher for the Radtel RT-950 Pro.">
+  <title>RT-950 Pro Firmware Flasher</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">Radtel RT-950 Pro</p>
+      <h1>Firmware Flasher</h1>
+      <p class="lead">Flash a <code>.btf</code> image directly from a Chromium browser using Web Serial.</p>
+    </header>
+
+    <section class="card warning" aria-labelledby="safety-title">
+      <h2 id="safety-title">Before you flash</h2>
+      <ul>
+        <li>Use Chromium, Edge, or another browser with Web Serial support.</li>
+        <li>Put the radio in its bootloader / programming mode, then connect its USB programming cable.</li>
+        <li>Do not disconnect power or close this page until flashing has completed.</li>
+      </ul>
+    </section>
+
+    <section class="card" aria-labelledby="image-title">
+      <h2 id="image-title">1. Select firmware</h2>
+      <label class="file-picker" for="firmware-file">
+        <span>Choose a <code>.btf</code> firmware file</span>
+        <input id="firmware-file" type="file" accept=".btf,application/octet-stream">
+      </label>
+      <p id="file-details" class="muted" aria-live="polite">No firmware selected.</p>
+    </section>
+
+    <section class="card" aria-labelledby="device-title">
+      <h2 id="device-title">2. Connect the radio</h2>
+      <div class="actions">
+        <button id="connect-button" type="button">Connect serial device</button>
+        <button id="disconnect-button" type="button" class="secondary" disabled>Disconnect</button>
+      </div>
+      <p id="connection-status" class="muted" aria-live="polite">Not connected.</p>
+    </section>
+
+    <section class="card" aria-labelledby="flash-title">
+      <h2 id="flash-title">3. Flash firmware</h2>
+      <div class="actions">
+        <button id="flash-button" type="button" class="flash" disabled>Flash firmware</button>
+      </div>
+      <progress id="progress" max="100" value="0">0%</progress>
+      <p id="progress-label" class="muted" aria-live="polite">Waiting for a firmware file and radio.</p>
+    </section>
+
+    <section class="card log-card" aria-labelledby="log-title">
+      <div class="section-heading"><h2 id="log-title">Activity</h2><button id="clear-log-button" class="text-button" type="button">Clear</button></div>
+      <pre id="activity-log" aria-live="polite">Ready.</pre>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
