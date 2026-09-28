@@ -7,12 +7,12 @@ The supplied capture identifies a small framed bootloader protocol rather than a
 All frames are binary and have this form:
 
 ```text
-AA | command | 00 | sequence | payload length (big-endian uint16) | payload | CRC-16 | 55
+AA | command | sequence (big-endian uint16) | payload length (big-endian uint16) | payload | CRC-16 | 55
 ```
 
 * `AA` and `55` are start/end sentinels.
-* Commands are one-byte values with a constant zero high byte in the capture.
-* The sequence is `0` for setup/final commands and is the zero-based 1024-byte block number for firmware blocks.
+* Commands are one-byte values.
+* The sequence is a big-endian uint16: `0` for setup/final commands and the zero-based 1024-byte block number for firmware blocks. The captured firmware used fewer than 256 blocks, so its sequence high byte was always zero.
 * CRC is **CRC-16/XMODEM** (polynomial `0x1021`, initial value `0x0000`, no reflection, no final XOR), calculated from `command` through the end of the payload—excluding `AA`, CRC, and `55`—and written big-endian.
 * The radio acknowledges each command using the same command, sequence `06`, a zero payload length, and a valid CRC. Captured acknowledgements can be physically split across reads, so the flasher buffers serial reads into complete frames.
 
@@ -28,4 +28,4 @@ The capture performs the following sequence:
 4. Command `03`: firmware blocks, each exactly 1024 bytes, sequenced from `0`.
 5. Command `45`: no payload; instructs the device to finish/restart.
 
-Every step waits for the acknowledgement before continuing. `app.js` implements these observed semantics and rejects files that cannot be represented by the one-byte block sequence.
+Every step waits for the acknowledgement before continuing. `app.js` implements these observed semantics and rejects files with more than 65,536 blocks, which cannot be represented by the uint16 sequence.

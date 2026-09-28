@@ -32,7 +32,8 @@ function crc16Xmodem(bytes) {
 function makeFrame(commandId, sequence, payload = new Uint8Array()) {
   if (payload.length > 0xffff) throw new Error('Frame payload is too large.');
   const frame = new Uint8Array(6 + payload.length + 3);
-  frame.set([START, commandId, 0x00, sequence, payload.length >> 8, payload.length & 0xff]);
+  if (!Number.isInteger(sequence) || sequence < 0 || sequence > 0xffff) throw new Error('Frame sequence is out of range.');
+  frame.set([START, commandId, sequence >> 8, sequence & 0xff, payload.length >> 8, payload.length & 0xff]);
   frame.set(payload, 6);
   const crc = crc16Xmodem(frame.subarray(1, 6 + payload.length));
   frame[6 + payload.length] = crc >> 8;
@@ -102,7 +103,7 @@ async function disconnect() {
 
 async function flash() {
   if (!firmware || !port) return;
-  if (firmware.length === 0 || firmware.length % BLOCK_SIZE !== 0 || firmware.length / BLOCK_SIZE > 256 || firmware.length < IMAGE_HEADER_OFFSET + IMAGE_HEADER_SIZE) {
+  if (firmware.length === 0 || firmware.length % BLOCK_SIZE !== 0 || firmware.length / BLOCK_SIZE > 0x10000 || firmware.length < IMAGE_HEADER_OFFSET + IMAGE_HEADER_SIZE) {
     throw new Error(`Expected a non-empty .btf image in ${BLOCK_SIZE}-byte blocks (at least ${IMAGE_HEADER_OFFSET + IMAGE_HEADER_SIZE} bytes).`);
   }
   busy = true; updateControls(); pendingBytes = new Uint8Array();
