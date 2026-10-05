@@ -111,6 +111,14 @@ async function writeBytes(bytes) {
   try { await writer.write(bytes); } finally { writer.releaseLock(); }
 }
 
+async function reopenSerial(baudRate) {
+  await stopReader();
+  if (port.readable) await port.close();
+  await port.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
+  rxBuffer = new Uint8Array();
+  startReader();
+}
+
 async function sendBaudChange(baudRate) {
   const packet = new Uint8Array(6);
   packet[0] = SIGNATURE;
@@ -123,13 +131,18 @@ async function sendBaudChange(baudRate) {
   if (baudRate === 38400) {
     expectAck(await readExactly(2, 3000), command.changeBaud);
   } else {
-    await stopReader();
-    await port.close();
-    await port.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
-    rxBuffer = new Uint8Array();
-    startReader();
+    await reopenSerial(baudRate);
     expectAck(await readExactly(2, 3000), command.changeBaud);
   }
+}
+
+async function beginTransferSession() {
+  const baudRate = Number(elements['baud-rate'].value);
+  // The radio falls back to 38,400 after idle time, so synchronize the host speed before every transfer.
+  await reopenSerial(38400);
+  await sendBaudChange(baudRate);
+  elements['connection-status'].textContent = `Connected; transfer session at ${baudRate.toLocaleString()} baud.`;
+  log(`Transfer session baud rate set to ${baudRate.toLocaleString()} baud.`);
 }
 
 function updateControls() {
@@ -153,14 +166,17 @@ async function disconnect() {
 }
 
 async function transferBlock(commandId, address, data) {
-  const packet = new Uint8Array(2 + 4 + data.length + 1);
+  const isRead = commandId === command.readBlock;
+  const packet = new Uint8Array(isRead ? 6 : 2 + 4 + data.length + 1);
   packet[0] = SIGNATURE;
   packet[1] = commandId;
   packet.set(addressBytes(address), 2);
-  packet.set(data, 6);
-  packet[packet.length - 1] = checksum(data);
+  if (!isRead) {
+    packet.set(data, 6);
+    packet[packet.length - 1] = checksum(data);
+  }
   await writeBytes(packet);
-  if (commandId === command.readBlock) {
+  if (isRead) {
     const response = await readExactly(2 + 4 + BLOCK_SIZE + 1, 10000);
     if (response[0] !== SIGNATURE || response[1] !== command.readBlock) throw new Error(`Invalid read response at address 0x${address.toString(16)}.`);
     const view = new DataView(response.buffer, response.byteOffset, response.byteLength);
@@ -188,9 +204,11 @@ async function backup() {
   const blocks = NAND_SIZE / BLOCK_SIZE;
   try {
     log(`Starting ${NAND_SIZE.toLocaleString()}-byte NAND backup using 4 KiB read packets.`);
+    elements['connection-status'].textContent = 'Starting transfer session at 38,400 baud…';
+    await beginTransferSession();
     for (let index = 0; index < blocks; index += 1) {
       const address = index * BLOCK_SIZE;
-      data.set(await transferBlock(command.readBlock, address, new Uint8Array(BLOCK_SIZE)), address);
+      data.set(await transferBlock(command.readBlock, address), address);
       updateProgress(index + 1, blocks, 'Reading');
     }
     const blob = new Blob([data], { type: 'application/octet-stream' });
@@ -218,6 +236,8 @@ async function restore() {
   const blocks = NAND_SIZE / BLOCK_SIZE;
   try {
     log(`Starting ${NAND_SIZE.toLocaleString()}-byte NAND restore using 4 KiB write packets.`);
+    elements['connection-status'].textContent = 'Starting transfer session at 38,400 baud…';
+    await beginTransferSession();
     for (let index = 0; index < blocks; index += 1) {
       const address = index * BLOCK_SIZE;
       const block = backupData.slice(address, address + BLOCK_SIZE);
@@ -256,15 +276,14 @@ elements['backup-file'].addEventListener('change', async ({ target }) => {
 elements['connect-button'].addEventListener('click', async () => {
   try {
     if (!('serial' in navigator)) throw new Error('Web Serial is unavailable. Use a current Chromium-based browser over HTTPS or localhost.');
-    const selectedBaud = Number(elements['baud-rate'].value);
+    elements['connection-status'].textContent = 'Select the serial device to connect…';
     port = await navigator.serial.requestPort();
+    elements['connection-status'].textContent = 'Opening serial device at 38,400 baud…';
     await port.open({ baudRate: 38400, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
     rxBuffer = new Uint8Array();
     startReader();
-    log(`Connected at 38,400 baud; requesting ${selectedBaud.toLocaleString()} baud.`);
-    await sendBaudChange(selectedBaud);
-    elements['connection-status'].textContent = `Connected at ${selectedBaud.toLocaleString()} baud. Baud change acknowledged.`;
-    log(`Session baud rate set to ${selectedBaud.toLocaleString()} baud.`);
+    elements['connection-status'].textContent = 'Connected at 38,400 baud. Ready to transfer.';
+    log('Serial device connected at 38,400 baud. Baud negotiation will run when a transfer starts.');
     updateControls();
   } catch (error) {
     elements['connection-status'].textContent = `Connection failed: ${error.message}`;
