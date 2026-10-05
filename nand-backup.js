@@ -77,7 +77,7 @@ function startReader() {
         const { value, done } = result;
         if (done) break;
         if (readerUsesByob && value) buffer = value.buffer;
-        receiveChunk(value);
+        receiveChunk(readerUsesByob && value ? value.slice() : value);
       }
     } catch (error) {
       if (port) failWaiter(error);
@@ -229,7 +229,7 @@ async function backup() {
   busy = true;
   updateControls();
   elements.progress.value = 0;
-  rxBuffer = new Uint8Array();
+  resetReceiveQueue();
   const data = new Uint8Array(NAND_SIZE);
   const blocks = NAND_SIZE / BLOCK_SIZE;
   try {
@@ -262,7 +262,7 @@ async function restore() {
   busy = true;
   updateControls();
   elements.progress.value = 0;
-  rxBuffer = new Uint8Array();
+  resetReceiveQueue();
   const blocks = NAND_SIZE / BLOCK_SIZE;
   try {
     log(`Starting ${NAND_SIZE.toLocaleString()}-byte NAND restore using 4 KiB write packets.`);
@@ -310,7 +310,7 @@ elements['connect-button'].addEventListener('click', async () => {
     port = await navigator.serial.requestPort();
     elements['connection-status'].textContent = 'Opening serial device at 38,400 baud…';
     await port.open({ baudRate: 38400, bufferSize: SERIAL_BUFFER_SIZE, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
-    rxBuffer = new Uint8Array();
+    resetReceiveQueue();
     startReader();
     elements['connection-status'].textContent = 'Connected at 38,400 baud. Ready to transfer.';
     log('Serial device connected at 38,400 baud. Baud negotiation will run when a transfer starts.');
