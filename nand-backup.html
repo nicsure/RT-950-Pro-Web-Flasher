@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Back up and restore the full 4 MiB NAND storage in an RT-950 Pro over Web Serial.">
+  <title>RT-950 Pro NAND Backup &amp; Restore</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">Radtel RT-950 Pro</p>
+      <h1>NAND Backup &amp; Restore</h1>
+      <p class="lead">Back up or restore the full 4 MiB NAND storage through the firmware serial protocol.</p>
+      <p><a href="./">← Firmware flasher</a></p>
+    </header>
+
+    <section class="card warning" aria-labelledby="warning-title">
+      <h2 id="warning-title">Before you continue</h2>
+      <ul>
+        <li>Use a Chromium-based browser over HTTPS or localhost and the RT-880 USB serial programming cable.</li>
+        <li>Keep the radio powered and connected for the entire transfer.</li>
+        <li>Restoring replaces the entire NAND contents. Use a backup made for this device.</li>
+      </ul>
+    </section>
+
+    <section class="card" aria-labelledby="connection-title">
+      <h2 id="connection-title">1. Connect and set the serial speed</h2>
+      <label for="baud-rate">Session baud rate</label>
+      <select id="baud-rate">
+        <option value="38400">38,400 baud</option>
+        <option value="57600">57,600 baud</option>
+        <option value="115200" selected>115,200 baud</option>
+        <option value="230400">230,400 baud</option>
+        <option value="460800">460,800 baud</option>
+        <option value="518400">518,400 baud</option>
+      </select>
+      <div class="actions" style="margin-top:.8rem">
+        <button id="connect-button" type="button">Connect serial device</button>
+        <button id="disconnect-button" type="button" class="secondary" disabled>Disconnect</button>
+      </div>
+      <p id="connection-status" class="muted" aria-live="polite">Not connected.</p>
+    </section>
+
+    <section class="card" aria-labelledby="backup-title">
+      <h2 id="backup-title">2. Back up NAND</h2>
+      <p class="muted">Reads 1,024 sequential 4,096-byte blocks from address 0 through 4 MiB.</p>
+      <div class="actions"><button id="backup-button" type="button" disabled>Download 4 MiB backup</button></div>
+    </section>
+
+    <section class="card" aria-labelledby="restore-title">
+      <h2 id="restore-title">3. Restore NAND (optional)</h2>
+      <label class="file-picker" for="backup-file">
+        <span>Select a full 4 MiB backup file</span>
+        <input id="backup-file" type="file" accept=".bin,application/octet-stream">
+      </label>
+      <p id="file-details" class="muted" aria-live="polite">No backup selected.</p>
+      <div class="actions"><button id="restore-button" type="button" class="flash" disabled>Restore selected backup</button></div>
+      <p class="muted">The app verifies each 4 KiB packet, finalizes flash writes, then sends the reboot command.</p>
+    </section>
+
+    <section class="card" aria-labelledby="progress-title">
+      <h2 id="progress-title">Transfer progress</h2>
+      <progress id="progress" max="100" value="0">0%</progress>
+      <p id="progress-label" class="muted" aria-live="polite">Connect to the radio to begin.</p>
+    </section>
+
+    <section class="card log-card" aria-labelledby="log-title">
+      <div class="section-heading"><h2 id="log-title">Activity</h2><button id="clear-log-button" class="text-button" type="button">Clear</button></div>
+      <pre id="activity-log" aria-live="polite">Ready.</pre>
+    </section>
+  </main>
+  <script type="module" src="nand-backup.js"></script>
+</body>
+</html>
