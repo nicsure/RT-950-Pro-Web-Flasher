@@ -96,8 +96,9 @@ function expectAck(response, commandId) {
   }
 }
 
-function checksum(bytes) {
+function checksum(bytes, address) {
   let total = 0;
+  for (const byte of addressBytes(address)) total = (total + byte) & 0xff;
   for (const byte of bytes) total = (total + byte) & 0xff;
   return total;
 }
@@ -173,7 +174,7 @@ async function transferBlock(commandId, address, data) {
   packet.set(addressBytes(address), 2);
   if (!isRead) {
     packet.set(data, 6);
-    packet[packet.length - 1] = checksum(data);
+    packet[packet.length - 1] = checksum(data, address);
   }
   await writeBytes(packet);
   if (isRead) {
@@ -182,7 +183,7 @@ async function transferBlock(commandId, address, data) {
     const view = new DataView(response.buffer, response.byteOffset, response.byteLength);
     if (view.getUint32(2, true) !== address) throw new Error(`Radio returned the wrong address for block 0x${address.toString(16)}.`);
     const block = response.slice(6, 6 + BLOCK_SIZE);
-    if (checksum(block) !== response[response.length - 1]) throw new Error(`Checksum mismatch at address 0x${address.toString(16)}.`);
+    if (checksum(block, address) !== response[response.length - 1]) throw new Error(`Checksum mismatch at address 0x${address.toString(16)}.`);
     return block;
   }
   expectAck(await readExactly(2, 10000), command.writeBlock);
