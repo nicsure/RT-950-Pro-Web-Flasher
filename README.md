@@ -10,6 +10,9 @@ A browser-only firmware flasher for the Radtel RT-950 Pro handheld transceiver. 
 1. Click this GitHub Pages link
    https://nicsure.github.io/RT-950-Pro-Web-Flasher/
 
+## NAND Backup and Restore
+Open [`nand-backup.html`](nand-backup.html) to back up or restore exactly 4 MiB using the firmware serial protocol's 4,096-byte packets. The app starts each connection at 38,400 baud, sends the selected baud-rate command, and waits for acknowledgements before enabling transfers. Restore writes every block, sends Finalize Write, then reboots the radio.
+
 ## Flash Firmware File
 1. Put the radio into bootloader/programming mode and connect its programming cable.  
    To do this, power the radio on while holding the bottom two side buttons.  
