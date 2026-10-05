@@ -218,10 +218,12 @@ async function transferBlock(commandId, address, data) {
   expectAck(await readExactly(2, 10000), command.writeBlock);
 }
 
-function updateProgress(index, total, operation) {
+function updateProgress(index, total, operation, startedAt) {
   const percent = Math.round((index / total) * 100);
+  const elapsedSeconds = Math.max((performance.now() - startedAt) / 1000, 0.001);
+  const blocksPerSecond = (index / elapsedSeconds).toFixed(1);
   elements.progress.value = percent;
-  elements['progress-label'].textContent = `${operation}: block ${index.toLocaleString()} of ${total.toLocaleString()} (${percent}%).`;
+  elements['progress-label'].textContent = `${operation}: block ${index.toLocaleString()} of ${total.toLocaleString()} (${percent}%, ${blocksPerSecond} blocks/s).`;
 }
 
 async function backup() {
@@ -232,6 +234,7 @@ async function backup() {
   resetReceiveQueue();
   const data = new Uint8Array(NAND_SIZE);
   const blocks = NAND_SIZE / BLOCK_SIZE;
+  const startedAt = performance.now();
   try {
     log(`Starting ${NAND_SIZE.toLocaleString()}-byte NAND backup using 4 KiB read packets.`);
     elements['connection-status'].textContent = 'Starting transfer session at 38,400 baud…';
@@ -239,7 +242,7 @@ async function backup() {
     for (let index = 0; index < blocks; index += 1) {
       const address = index * BLOCK_SIZE;
       data.set(await transferBlock(command.readBlock, address), address);
-      updateProgress(index + 1, blocks, 'Reading');
+      updateProgress(index + 1, blocks, 'Reading', startedAt);
     }
     const blob = new Blob([data], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
@@ -264,6 +267,7 @@ async function restore() {
   elements.progress.value = 0;
   resetReceiveQueue();
   const blocks = NAND_SIZE / BLOCK_SIZE;
+  const startedAt = performance.now();
   try {
     log(`Starting ${NAND_SIZE.toLocaleString()}-byte NAND restore using 4 KiB write packets.`);
     elements['connection-status'].textContent = 'Starting transfer session at 38,400 baud…';
@@ -272,7 +276,7 @@ async function restore() {
       const address = index * BLOCK_SIZE;
       const block = backupData.slice(address, address + BLOCK_SIZE);
       await transferBlock(command.writeBlock, address, block);
-      updateProgress(index + 1, blocks, 'Writing');
+      updateProgress(index + 1, blocks, 'Writing', startedAt);
     }
     await writeBytes(new Uint8Array([SIGNATURE, command.finalize]));
     expectAck(await readExactly(2, 10000), command.finalize);
