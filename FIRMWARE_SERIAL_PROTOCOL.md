@@ -73,7 +73,7 @@ These commands allow the host to access the radio’s flash storage. Sequential 
 | 1 | `0x30` – Command ID |
 | 4 | Storage address |
 | 128 | Storage data |
-| 1 | Additive checksum of the 4-byte storage address and storage data |
+| 1 | Additive checksum of storage data |
 
 ---
 
@@ -87,7 +87,7 @@ These commands allow the host to access the radio’s flash storage. Sequential 
 | 1 | `0x40` – Command ID (Write 128 bytes) |
 | 4 | Storage address |
 | 128 | Storage data |
-| 1 | Additive checksum of the 4-byte storage address and storage data |
+| 1 | Additive checksum of storage data |
 
 ### Radio → Host
 
@@ -116,7 +116,7 @@ These commands allow the host to access the radio’s flash storage. Sequential 
 | 1 | `0x10` – Command ID |
 | 4 | Storage address |
 | 4096 | Storage data |
-| 1 | Additive checksum of storage data |
+| 1 | Additive checksum of the 4-byte storage address and storage data |
 
 ---
 
@@ -130,7 +130,7 @@ These commands allow the host to access the radio’s flash storage. Sequential 
 | 1 | `0x20` – Command ID (Write 4096 bytes) |
 | 4 | Storage address |
 | 4096 | Storage data |
-| 1 | Additive checksum of storage data |
+| 1 | Additive checksum of the 4-byte storage address and storage data |
 
 ### Radio → Host
 
