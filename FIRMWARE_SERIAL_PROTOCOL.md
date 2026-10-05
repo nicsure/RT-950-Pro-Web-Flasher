@@ -116,7 +116,7 @@ These commands allow the host to access the radio’s flash storage. Sequential 
 | 1 | `0x10` – Command ID |
 | 4 | Storage address |
 | 4096 | Storage data |
-| 1 | Additive checksum of storage data |
+| 1 | Additive checksum of the 4-byte storage address and storage data |
 
 ---
 
@@ -130,7 +130,7 @@ These commands allow the host to access the radio’s flash storage. Sequential 
 | 1 | `0x20` – Command ID (Write 4096 bytes) |
 | 4 | Storage address |
 | 4096 | Storage data |
-| 1 | Additive checksum of storage data |
+| 1 | Additive checksum of the 4-byte storage address and storage data |
 
 ### Radio → Host
 
@@ -140,6 +140,9 @@ These commands allow the host to access the radio’s flash storage. Sequential 
 | 1 | `0x20` – Command ID |
 
 ---
+
+
+For the 4096-byte read and write commands, the checksum is the low 8 bits of the sum of all four address bytes and all 4096 data bytes. The signature and command bytes are not included.
 
 ## Finalize Write
 
