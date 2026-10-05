@@ -9,17 +9,32 @@ A browser-only firmware flasher for the Radtel RT-950 Pro handheld transceiver. 
 ## Or Run via the Web Directly
 1. Click this GitHub Pages link
    https://nicsure.github.io/RT-950-Pro-Web-Flasher/
+   
+---
 
-## NAND Backup and Restore
-Open [`nand-backup.html`](nand-backup.html) to back up or restore exactly 4 MiB using the firmware serial protocol's 4,096-byte packets. Connecting opens the port at 38,400 baud. Each backup or restore transfer negotiates the selected speed and waits for acknowledgements; the speed is reset to 38,400 before the next transfer to account for the radio's idle timeout. Restore writes every block, sends Finalize Write, then reboots the radio.
+# NAND Backup and Restore
 
-## Flash Firmware File
-1. Put the radio into bootloader/programming mode and connect its programming cable.  
-   To do this, power the radio on while holding the bottom two side buttons.  
-   The screen of the radio should display "Update"
-2. Select the `.btf` file, choose **Connect serial device**, then choose **Flash firmware**.
-3. Keep the radio powered and connected until the application reports completion.
+### Making a backup.
 
-The flasher opens the selected serial port at 115200 8N1 with flow control disabled and validates an acknowledgement and CRC after every command. The observed protocol and firmware layout are documented in [PROTOCOL.md](PROTOCOL.md).
+1. Use the above instructions to flash the backup and restore firmware .btf file  
+2. Once flashed click here https://nicsure.github.io/RT-950-Pro-Web-Flasher/nand-backup.html to open the Storage Backup web application (or you can host it yourself using the same method as described above).
+3. Turn on the radio if not already on. The display should show "Backup & Restore"
+4. Select your BAUD rate, you may need to experiment to find the most stable speed, faster is better.
+5. Click "Download 4 MiB backup" and wait for the process to complete.
+6. Save the file and keep it safe.
+
+### Restoring a backup
+
+1. Use the above instructions to flash the backup and restore firmware .btf file
+2. Once flashed click here https://nicsure.github.io/RT-950-Pro-Web-Flasher/nand-backup.html to open the Storage Backup web application
+3. Turn on the radio if not already on. The display should show "Backup & Restore"
+4. Select your BAUD rate
+5. Click "Choose file" and browse to your backup image file.
+6. Click "Restore selected backup" and wait for the process to complete.
+7. Turn off the radio.
+8. Follow the above instruction to flash the original factory firmware back onto the radio.
+
+
+---
 
 > **Warning:** Flashing firmware can render a radio unusable if the wrong image is selected or power is interrupted. Confirm that the firmware is intended for your exact device before proceeding.
