@@ -1,5 +1,6 @@
 const NAND_SIZE = 4 * 1024 * 1024;
 const BLOCK_SIZE = 4096;
+const READ_PIPELINE_DEPTH = 4;
 const SIGNATURE = 0xaa;
 const command = { changeBaud: 0x70, readBlock: 0x10, writeBlock: 0x20, finalize: 0x48, reboot: 0x50 };
 const elements = Object.fromEntries([
@@ -166,26 +167,43 @@ async function disconnect() {
   updateControls();
 }
 
+async function sendReadRequest(address) {
+  const packet = new Uint8Array(6);
+  packet[0] = SIGNATURE;
+  packet[1] = command.readBlock;
+  packet.set(addressBytes(address), 2);
+  await writeBytes(packet);
+}
+
+async function receiveReadBlock(address) {
+  const response = await readExactly(2 + 4 + BLOCK_SIZE + 1, 15000);
+  if (response[0] !== SIGNATURE || response[1] !== command.readBlock) {
+    throw new Error(`Invalid read response at address 0x${address.toString(16)}.`);
+  }
+  const view = new DataView(response.buffer, response.byteOffset, response.byteLength);
+  if (view.getUint32(2, true) !== address) {
+    throw new Error(`Radio returned the wrong address for block 0x${address.toString(16)}.`);
+  }
+  const block = response.slice(6, 6 + BLOCK_SIZE);
+  if (checksum(block, address) !== response[response.length - 1]) {
+    throw new Error(`Checksum mismatch at address 0x${address.toString(16)}.`);
+  }
+  return block;
+}
+
 async function transferBlock(commandId, address, data) {
-  const isRead = commandId === command.readBlock;
-  const packet = new Uint8Array(isRead ? 6 : 2 + 4 + data.length + 1);
+  if (commandId === command.readBlock) {
+    await sendReadRequest(address);
+    return receiveReadBlock(address);
+  }
+
+  const packet = new Uint8Array(2 + 4 + data.length + 1);
   packet[0] = SIGNATURE;
   packet[1] = commandId;
   packet.set(addressBytes(address), 2);
-  if (!isRead) {
-    packet.set(data, 6);
-    packet[packet.length - 1] = checksum(data, address);
-  }
+  packet.set(data, 6);
+  packet[packet.length - 1] = checksum(data, address);
   await writeBytes(packet);
-  if (isRead) {
-    const response = await readExactly(2 + 4 + BLOCK_SIZE + 1, 10000);
-    if (response[0] !== SIGNATURE || response[1] !== command.readBlock) throw new Error(`Invalid read response at address 0x${address.toString(16)}.`);
-    const view = new DataView(response.buffer, response.byteOffset, response.byteLength);
-    if (view.getUint32(2, true) !== address) throw new Error(`Radio returned the wrong address for block 0x${address.toString(16)}.`);
-    const block = response.slice(6, 6 + BLOCK_SIZE);
-    if (checksum(block, address) !== response[response.length - 1]) throw new Error(`Checksum mismatch at address 0x${address.toString(16)}.`);
-    return block;
-  }
   expectAck(await readExactly(2, 10000), command.writeBlock);
 }
 
@@ -207,10 +225,18 @@ async function backup() {
     log(`Starting ${NAND_SIZE.toLocaleString()}-byte NAND backup using 4 KiB read packets.`);
     elements['connection-status'].textContent = 'Starting transfer session at 38,400 baud…';
     await beginTransferSession();
-    for (let index = 0; index < blocks; index += 1) {
-      const address = index * BLOCK_SIZE;
-      data.set(await transferBlock(command.readBlock, address), address);
-      updateProgress(index + 1, blocks, 'Reading');
+    for (let first = 0; first < blocks; first += READ_PIPELINE_DEPTH) {
+      const count = Math.min(READ_PIPELINE_DEPTH, blocks - first);
+      // Keep a few requests queued so the radio can send consecutive blocks without host round-trip gaps.
+      for (let offset = 0; offset < count; offset += 1) {
+        await sendReadRequest((first + offset) * BLOCK_SIZE);
+      }
+      for (let offset = 0; offset < count; offset += 1) {
+        const index = first + offset;
+        const address = index * BLOCK_SIZE;
+        data.set(await receiveReadBlock(address), address);
+        updateProgress(index + 1, blocks, 'Reading');
+      }
     }
     const blob = new Blob([data], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
