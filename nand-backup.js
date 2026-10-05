@@ -1,5 +1,6 @@
 const NAND_SIZE = 4 * 1024 * 1024;
 const BLOCK_SIZE = 4096;
+const SERIAL_BUFFER_SIZE = 64 * 1024;
 const SIGNATURE = 0xaa;
 const command = { changeBaud: 0x70, readBlock: 0x10, writeBlock: 0x20, finalize: 0x48, reboot: 0x50 };
 const elements = Object.fromEntries([
@@ -11,7 +12,9 @@ const elements = Object.fromEntries([
 let port;
 let reader;
 let readTask;
-let rxBuffer = new Uint8Array();
+let rxChunks = [];
+let rxLength = 0;
+let readerUsesByob = false;
 let readWaiter;
 let busy = false;
 let backupData;
@@ -22,31 +25,59 @@ function log(message) {
   elements['activity-log'].scrollTop = elements['activity-log'].scrollHeight;
 }
 
-function concat(left, right) {
-  const result = new Uint8Array(left.length + right.length);
-  result.set(left);
-  result.set(right, left.length);
+function resetReceiveQueue() {
+  rxChunks = [];
+  rxLength = 0;
+}
+
+function takeReceivedBytes(length) {
+  const result = new Uint8Array(length);
+  let offset = 0;
+  while (offset < length) {
+    const chunk = rxChunks[0];
+    const count = Math.min(chunk.length, length - offset);
+    result.set(chunk.subarray(0, count), offset);
+    offset += count;
+    rxLength -= count;
+    if (count === chunk.length) rxChunks.shift();
+    else rxChunks[0] = chunk.subarray(count);
+  }
   return result;
+}
+
+function receiveChunk(value) {
+  if (!value?.length) return;
+  rxChunks.push(value);
+  rxLength += value.length;
+  if (readWaiter && rxLength >= readWaiter.length) {
+    const waiter = readWaiter;
+    readWaiter = undefined;
+    clearTimeout(waiter.timer);
+    waiter.resolve(takeReceivedBytes(waiter.length));
+  }
 }
 
 function startReader() {
   if (!port?.readable) throw new Error('Serial device is not readable.');
-  reader = port.readable.getReader();
+  try {
+    reader = port.readable.getReader({ mode: 'byob' });
+    readerUsesByob = true;
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    reader = port.readable.getReader();
+    readerUsesByob = false;
+  }
   readTask = (async () => {
+    let buffer = new ArrayBuffer(SERIAL_BUFFER_SIZE);
     try {
       while (true) {
-        const { value, done } = await reader.read();
+        const result = readerUsesByob
+          ? await reader.read(new Uint8Array(buffer))
+          : await reader.read();
+        const { value, done } = result;
         if (done) break;
-        if (!value?.length) continue;
-        rxBuffer = concat(rxBuffer, value);
-        if (readWaiter && rxBuffer.length >= readWaiter.length) {
-          const waiter = readWaiter;
-          readWaiter = undefined;
-          clearTimeout(waiter.timer);
-          const result = rxBuffer.slice(0, waiter.length);
-          rxBuffer = rxBuffer.slice(waiter.length);
-          waiter.resolve(result);
-        }
+        if (readerUsesByob && value) buffer = value.buffer;
+        receiveChunk(value);
       }
     } catch (error) {
       if (port) failWaiter(error);
@@ -66,10 +97,8 @@ function failWaiter(error) {
 }
 
 function readExactly(length, timeoutMs = 5000) {
-  if (rxBuffer.length >= length) {
-    const result = rxBuffer.slice(0, length);
-    rxBuffer = rxBuffer.slice(length);
-    return Promise.resolve(result);
+  if (rxLength >= length) {
+    return Promise.resolve(takeReceivedBytes(length));
   }
   if (readWaiter) return Promise.reject(new Error('Internal protocol error: overlapping serial reads.'));
   return new Promise((resolve, reject) => {
@@ -115,8 +144,8 @@ async function writeBytes(bytes) {
 async function reopenSerial(baudRate) {
   await stopReader();
   if (port.readable) await port.close();
-  await port.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
-  rxBuffer = new Uint8Array();
+  await port.open({ baudRate, bufferSize: SERIAL_BUFFER_SIZE, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
+  resetReceiveQueue();
   startReader();
 }
 
@@ -161,7 +190,7 @@ async function disconnect() {
   await stopReader();
   try { await oldPort.close(); } catch (error) { log(`Disconnect warning: ${error.message}`); }
   port = undefined;
-  rxBuffer = new Uint8Array();
+  resetReceiveQueue();
   elements['connection-status'].textContent = 'Not connected.';
   updateControls();
 }
@@ -280,7 +309,7 @@ elements['connect-button'].addEventListener('click', async () => {
     elements['connection-status'].textContent = 'Select the serial device to connect…';
     port = await navigator.serial.requestPort();
     elements['connection-status'].textContent = 'Opening serial device at 38,400 baud…';
-    await port.open({ baudRate: 38400, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
+    await port.open({ baudRate: 38400, bufferSize: SERIAL_BUFFER_SIZE, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
     rxBuffer = new Uint8Array();
     startReader();
     elements['connection-status'].textContent = 'Connected at 38,400 baud. Ready to transfer.';
