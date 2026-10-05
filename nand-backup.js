@@ -125,7 +125,6 @@ async function sendBaudChange(baudRate) {
   } else {
     await stopReader();
     await port.close();
-    await new Promise((resolve) => setTimeout(resolve, 120));
     await port.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
     rxBuffer = new Uint8Array();
     startReader();
