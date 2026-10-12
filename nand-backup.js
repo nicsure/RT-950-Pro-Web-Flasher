@@ -241,11 +241,14 @@ async function disconnect() {
 
 async function transferBlock(commandId, address, data) {
   const isRead = commandId === command.readBlock;
-  const packet = new Uint8Array(isRead ? 6 : 2 + 4 + data.length + 1);
+  // The read state machine executes when it receives one byte after the four-byte address.
+  const packet = new Uint8Array(isRead ? 7 : 2 + 4 + data.length + 1);
   packet[0] = SIGNATURE;
   packet[1] = commandId;
   packet.set(addressBytes(address), 2);
-  if (!isRead) {
+  if (isRead) {
+    packet[6] = 0x00;
+  } else {
     packet.set(data, 6);
     packet[packet.length - 1] = checksum(data, address);
   }
