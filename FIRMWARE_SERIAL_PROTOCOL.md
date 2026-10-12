@@ -108,6 +108,7 @@ These commands allow the host to access the radio’s flash storage. Sequential 
 | 1 | `0xAA` – Signature |
 | 1 | `0x10` – Command ID (Read 4096 bytes) |
 | 4 | Storage address |
+| 1 | `0x00` – Triggers the read after the address is received |
 
 ### Radio → Host
 
