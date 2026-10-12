@@ -170,10 +170,12 @@ async function waitForSecondBaudAck() {
 }
 
 async function sendBaudChange(baudRate) {
-  const packet = new Uint8Array(6);
+  // The firmware baud-change parser needs one extra byte to leave its packet state.
+  const packet = new Uint8Array(7);
   packet[0] = SIGNATURE;
   packet[1] = command.changeBaud;
   new DataView(packet.buffer).setUint32(2, baudRate, true);
+  packet[6] = 0x00;
   log('Sending baud-change request at 38,400 baud.');
   await writeBytes(packet);
 
