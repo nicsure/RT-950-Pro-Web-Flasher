@@ -18,6 +18,8 @@ let readerUsesByob = false;
 let readWaiter;
 let busy = false;
 let backupData;
+let hostBaudRate;
+let lastSerialActivityAt = Date.now();
 
 function log(message) {
   const timestamp = new Date().toLocaleTimeString();
@@ -47,6 +49,7 @@ function takeReceivedBytes(length) {
 
 function receiveChunk(value) {
   if (!value?.length) return;
+  lastSerialActivityAt = Date.now();
   rxChunks.push(value);
   rxLength += value.length;
   if (readWaiter && rxLength >= readWaiter.length) {
@@ -138,15 +141,32 @@ function addressBytes(address) {
 
 async function writeBytes(bytes) {
   const writer = port.writable.getWriter();
-  try { await writer.write(bytes); } finally { writer.releaseLock(); }
+  try {
+    await writer.write(bytes);
+    lastSerialActivityAt = Date.now();
+  } finally { writer.releaseLock(); }
 }
 
 async function reopenSerial(baudRate) {
   await stopReader();
   if (port.readable) await port.close();
   await port.open({ baudRate, bufferSize: SERIAL_BUFFER_SIZE, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
+  hostBaudRate = baudRate;
   resetReceiveQueue();
   startReader();
+}
+
+async function waitForSecondBaudAck() {
+  try {
+    expectAck(await readExactly(2, 500), command.changeBaud);
+    log('Received the second baud-change acknowledgement.');
+  } catch (error) {
+    if (!error.message.startsWith('Timed out waiting for 2 response bytes.')) throw error;
+    // This acknowledgement is sent 100 ms after the first; on success the first block response
+    // will confirm the new speed if reopening the browser port missed this short acknowledgement.
+    resetReceiveQueue();
+    log('Second baud-change acknowledgement was not received; the first block response will verify the selected speed.');
+  }
 }
 
 async function sendBaudChange(baudRate) {
@@ -154,22 +174,32 @@ async function sendBaudChange(baudRate) {
   packet[0] = SIGNATURE;
   packet[1] = command.changeBaud;
   new DataView(packet.buffer).setUint32(2, baudRate, true);
+  log('Sending baud-change request at 38,400 baud.');
   await writeBytes(packet);
 
-  // The protocol sends one acknowledgement at 38,400, then repeats it at the selected speed after 100 ms.
-  expectAck(await readExactly(2, 3000), command.changeBaud);
-  if (baudRate === 38400) {
+  try {
     expectAck(await readExactly(2, 3000), command.changeBaud);
-  } else {
-    await reopenSerial(baudRate);
-    expectAck(await readExactly(2, 3000), command.changeBaud);
+  } catch (error) {
+    throw new Error(`No acknowledgement at 38,400 baud: ${error.message}`);
   }
+  log('Received baud-change acknowledgement at 38,400 baud.');
+
+  if (baudRate !== 38400) await reopenSerial(baudRate);
+  await waitForSecondBaudAck();
 }
 
 async function beginTransferSession() {
   const baudRate = Number(elements['baud-rate'].value);
-  // The radio falls back to 38,400 after idle time, so synchronize the host speed before every transfer.
-  await reopenSerial(38400);
+  // The radio returns to 38,400 after five seconds without serial activity.
+  // Avoid closing/reopening an already-correct 38,400 connection at the first transfer.
+  if (hostBaudRate !== 38400) {
+    const remainingIdleMs = 5100 - (Date.now() - lastSerialActivityAt);
+    if (remainingIdleMs > 0) {
+      elements['connection-status'].textContent = 'Waiting for the radio to return to 38,400 baud…';
+      await new Promise((resolve) => setTimeout(resolve, remainingIdleMs));
+    }
+    await reopenSerial(38400);
+  }
   await sendBaudChange(baudRate);
   elements['connection-status'].textContent = `Connected; transfer session at ${baudRate.toLocaleString()} baud.`;
   log(`Transfer session baud rate set to ${baudRate.toLocaleString()} baud.`);
@@ -190,6 +220,7 @@ async function disconnect() {
   await stopReader();
   try { await oldPort.close(); } catch (error) { log(`Disconnect warning: ${error.message}`); }
   port = undefined;
+  hostBaudRate = undefined;
   resetReceiveQueue();
   elements['connection-status'].textContent = 'Not connected.';
   updateControls();
@@ -315,6 +346,8 @@ elements['connect-button'].addEventListener('click', async () => {
     elements['connection-status'].textContent = 'Opening serial device at 38,400 baud…';
     await port.open({ baudRate: 38400, bufferSize: SERIAL_BUFFER_SIZE, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
     resetReceiveQueue();
+    hostBaudRate = 38400;
+    lastSerialActivityAt = Date.now();
     startReader();
     elements['connection-status'].textContent = 'Connected at 38,400 baud. Ready to transfer.';
     log('Serial device connected at 38,400 baud. Baud negotiation will run when a transfer starts.');
