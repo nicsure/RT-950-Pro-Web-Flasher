@@ -179,8 +179,19 @@ async function sendBaudChange(baudRate) {
 
   try {
     expectAck(await readExactly(2, 3000), command.changeBaud);
-  } catch (error) {
-    throw new Error(`No acknowledgement at 38,400 baud: ${error.message}`);
+  } catch (firstError) {
+    // The radio may still be at the previous session's baud. Let its documented idle fallback expire,
+    // then retry at 38,400 without sending more bytes during that interval.
+    const idleWaitMs = Math.max(0, 5100 - (Date.now() - lastSerialActivityAt));
+    log(`No 38,400-baud acknowledgement; waiting ${Math.ceil(idleWaitMs / 1000)} seconds for the radio's idle fallback, then retrying.`);
+    if (idleWaitMs > 0) await new Promise((resolve) => setTimeout(resolve, idleWaitMs));
+    await reopenSerial(38400);
+    await writeBytes(packet);
+    try {
+      expectAck(await readExactly(2, 3000), command.changeBaud);
+    } catch (retryError) {
+      throw new Error(`No baud-change acknowledgement at 38,400 baud after retry (first attempt: ${firstError.message}; retry: ${retryError.message}).`);
+    }
   }
   log('Received baud-change acknowledgement at 38,400 baud.');
 
