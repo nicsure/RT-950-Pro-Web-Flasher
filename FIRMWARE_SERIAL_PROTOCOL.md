@@ -42,6 +42,7 @@ The radio first replies **at the original baud rate**, then sends the same ackno
 
 ### Notes
 
+- Append one extra `0x00` byte after the six-byte baud-change packet. The firmware parser can remain in its final packet state until it receives another byte; this trailing null advances it so the baud change takes effect.
 - The radio defaults to **38,400 baud**
 - This command must be sent at **38,400 baud**
 - After **5 seconds of no serial activity**, the radio automatically falls back to 38,400 baud
