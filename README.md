@@ -16,7 +16,7 @@ A browser-only firmware flasher for the Radtel RT-950 Pro handheld transceiver. 
 
 ### Making a backup.
 
-1. Use the above instructions to flash the backup and restore firmware .btf file  
+1. Use the above instructions to flash the backup and restore firmware [rt950pro_flash_backup_restore.btf](https://www.patreon.com/nicsure/posts/radtel-rt-950-160721095?collection=1816951) file  
 2. Once flashed click here https://nicsure.github.io/RT-950-Pro-Web-Flasher/nand-backup.html to open the Storage Backup web application (or you can host it yourself using the same method as described above).
 3. Turn on the radio if not already on. The display should show "Backup & Restore"
 4. Select your BAUD rate, you may need to experiment to find the most stable speed, faster is better.
@@ -25,7 +25,7 @@ A browser-only firmware flasher for the Radtel RT-950 Pro handheld transceiver. 
 
 ### Restoring a backup
 
-1. Use the above instructions to flash the backup and restore firmware `rt950pro_flash_backup_restore.btf` file, it can be downloaded from here.
+1. Use the above instructions to flash the backup and restore firmware [rt950pro_flash_backup_restore.btf](https://www.patreon.com/nicsure/posts/radtel-rt-950-160721095?collection=1816951) file, it can be downloaded from here.
    https://www.patreon.com/nicsure/posts/radtel-rt-950-160721095?collection=1816951
 3. Once flashed click here https://nicsure.github.io/RT-950-Pro-Web-Flasher/nand-backup.html to open the Storage Backup web application
 4. Turn on the radio if not already on. The display should show "Backup & Restore"
