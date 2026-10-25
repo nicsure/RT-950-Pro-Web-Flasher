@@ -103,18 +103,21 @@ async function disconnect() {
 
 async function flash() {
   if (!firmware || !port) return;
-  if (firmware.length === 0 || firmware.length % BLOCK_SIZE !== 0 || firmware.length / BLOCK_SIZE > 0x10000 || firmware.length < IMAGE_HEADER_OFFSET + IMAGE_HEADER_SIZE) {
-    throw new Error(`Expected a non-empty .btf image in ${BLOCK_SIZE}-byte blocks (at least ${IMAGE_HEADER_OFFSET + IMAGE_HEADER_SIZE} bytes).`);
+  const blocks = Math.ceil(firmware.length / BLOCK_SIZE);
+  if (firmware.length < IMAGE_HEADER_OFFSET + IMAGE_HEADER_SIZE || blocks > 0x10000) {
+    throw new Error(`Expected a .btf image between ${IMAGE_HEADER_OFFSET + IMAGE_HEADER_SIZE} and ${BLOCK_SIZE * 0x10000} bytes.`);
   }
   busy = true; updateControls(); pendingBytes = new Uint8Array();
-  const blocks = firmware.length / BLOCK_SIZE;
   try {
     log('Starting RT-950 bootloader session.');
     await sendCommand(command.identify, 0, new TextEncoder().encode('BOOTLOADER_V3'));
     await sendCommand(command.imageHeader, 0, firmware.slice(IMAGE_HEADER_OFFSET, IMAGE_HEADER_OFFSET + IMAGE_HEADER_SIZE));
     await sendCommand(command.blockCount, 0, new Uint8Array([(blocks - 1) >> 8, (blocks - 1) & 0xff]));
     for (let index = 0; index < blocks; index += 1) {
-      await sendCommand(command.block, index, firmware.slice(index * BLOCK_SIZE, (index + 1) * BLOCK_SIZE));
+      // The bootloader takes full blocks; use erased flash bytes beyond EOF.
+      const block = new Uint8Array(BLOCK_SIZE).fill(0xff);
+      block.set(firmware.subarray(index * BLOCK_SIZE, (index + 1) * BLOCK_SIZE));
+      await sendCommand(command.block, index, block);
       const percent = Math.round(((index + 1) / blocks) * 100);
       elements.progress.value = percent;
       elements['progress-label'].textContent = `Writing block ${index + 1} of ${blocks} (${percent}%).`;
